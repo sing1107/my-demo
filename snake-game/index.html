@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>贪吃蛇小游戏</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-image: url('background.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        #gameBox {
+            border: none;
+            background-color: #1a1a2e;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 20px rgba(102, 126, 234, 0.5);
+        }
+        #score {
+            font-size: 28px;
+            margin: 20px 0;
+            color: #fff;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">得分：0</div>
+    <canvas id="gameBox" width="400" height="400"></canvas>
+
+    <script>
+        // 获取画布 DOM 和绘图上下文
+        const canvas = document.getElementById('gameBox');
+        const ctx = canvas.getContext('2d');
+        const scoreText = document.getElementById('score');
+
+        // 网格大小：蛇和食物都按这个单位移动
+        const grid = 20;
+        // 蛇的身体数组，初始只有一个头部
+        let snake = [{ x: 10 * grid, y: 10 * grid }];
+        // 食物位置对象
+        let food = {};
+        // 当前方向和下一步方向
+        let dir = 'right';
+        let nextDir = 'right';
+        // 当前得分
+        let score = 0;
+
+        // 随机生成食物位置，并避免出现在蛇身上
+        function createFood() {
+            food.x = Math.floor(Math.random() * canvas.width / grid) * grid;
+            food.y = Math.floor(Math.random() * canvas.height / grid) * grid;
+            snake.forEach(seg => {
+                if (seg.x === food.x && seg.y === food.y) createFood();
+            });
+        }
+
+        // 绘制一个方块格子
+        function drawRect(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, grid - 1, grid - 1);
+        }
+
+        // 游戏循环：移动蛇、检测死亡、绘制画面
+        function gameLoop() {
+            dir = nextDir; // 更新当前移动方向
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // 清空画布
+
+            // 绘制食物
+            drawRect(food.x, food.y, '#ff4444');
+
+            // 计算蛇头的新位置
+            let head = { ...snake[0] };
+            switch (dir) {
+                case 'up': head.y -= grid; break;
+                case 'down': head.y += grid; break;
+                case 'left': head.x -= grid; break;
+                case 'right': head.x += grid; break;
+            }
+
+            // 撞墙判定
+            if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
+                alert(`游戏结束！最终得分：${score}`);
+                location.reload();
+                return;
+            }
+
+            // 撞自己判定
+            for (let i = 0; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    alert(`游戏结束！最终得分：${score}`);
+                    location.reload();
+                    return;
+                }
+            }
+
+            // 将新头部加入蛇身
+            snake.unshift(head);
+            // 吃到食物则加分并生成新食物，否则移除蛇尾
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                scoreText.innerText = `得分：${score}`;
+                createFood();
+            } else {
+                snake.pop();
+            }
+
+            // 绘制蛇身，头部颜色与身体颜色不同
+            snake.forEach((seg, index) => {
+                drawRect(seg.x, seg.y, index === 0 ? '#228822' : '#44aa44');
+            });
+        }
+
+        // 键盘控制：上下左右方向键 - 在长按加速后处理
+        document.addEventListener('keydown', e => {
+            const key = e.key;
+            if (key === 'ArrowUp' && dir !== 'down') nextDir = 'up';
+            if (key === 'ArrowDown' && dir !== 'up') nextDir = 'down';
+            if (key === 'ArrowLeft' && dir !== 'right') nextDir = 'left';
+            if (key === 'ArrowRight' && dir !== 'left') nextDir = 'right';
+        }, true); // 使用捕获阶段确保优先级
+
+        // 游戏循环interval ID
+        let gameIntervalId = null;
+        // 基础速度和加速速度
+        const baseSpeed = 120;
+        const speedUpValue = Math.round(baseSpeed / 1.5); // 80ms
+        let isSpedUp = false;
+        // 记录当前按下的键
+        let pressedKeys = {};
+
+        // 长按方向键加速功能
+        document.addEventListener('keydown', e => {
+            pressedKeys[e.key] = true;
+            // 检测是否按下方向键
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                if (!isSpedUp) {
+                    isSpedUp = true;
+                    clearInterval(gameIntervalId);
+                    gameIntervalId = setInterval(gameLoop, speedUpValue);
+                }
+            }
+        });
+
+        document.addEventListener('keyup', e => {
+            pressedKeys[e.key] = false;
+            // 检测是否还有方向键被按下
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                const hasDirectionKeyPressed = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some(key => pressedKeys[key]);
+                if (!hasDirectionKeyPressed && isSpedUp) {
+                    isSpedUp = false;
+                    clearInterval(gameIntervalId);
+                    gameIntervalId = setInterval(gameLoop, baseSpeed);
+                }
+            }
+        });
+
+        // 启动游戏
+        createFood();
+        gameIntervalId = setInterval(gameLoop, baseSpeed); // 每120毫秒刷新一次
+    </script>
+</body>
+</html>
